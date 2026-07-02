@@ -41,6 +41,9 @@
 #include <queue>
 #include <future>
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <cctype>
 #include <chrono>
 #include <fstream>
 
@@ -150,36 +153,94 @@ static std::string sysRoot() {
     return "/data/data/com.termux/files/usr";
 }
 
+// Reject paths containing characters that are dangerous even when passed
+// directly to exec (control chars) — defensive validation.
+static bool isSafePath(const std::string& p) {
+    if (p.empty()) return false;
+    for (unsigned char c : p) {
+        if (c == '\0' || c == '\n' || c == '\r') return false;
+    }
+    return true;
+}
+
+// Split a flag string (e.g. from python3-config) on whitespace into argv tokens.
+// This does NOT interpret shell metacharacters — tokens are passed literally
+// to exec, so injection via `$()`, backticks, `;`, etc. is impossible.
+static std::vector<std::string> splitFlags(const std::string& s) {
+    std::vector<std::string> out;
+    std::string cur;
+    for (char c : s) {
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            if (!cur.empty()) { out.push_back(cur); cur.clear(); }
+        } else {
+            cur += c;
+        }
+    }
+    if (!cur.empty()) out.push_back(cur);
+    return out;
+}
+
+// Run a program with an explicit argv array via fork + execvp — NO shell is
+// involved, so none of the arguments can be interpreted as shell syntax.
+// Returns the child's exit status (0 == success), or -1 on spawn failure.
+static int runProcess(const std::vector<std::string>& args) {
+    if (args.empty()) return -1;
+    std::vector<char*> argv;
+    argv.reserve(args.size() + 1);
+    for (auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+    argv.push_back(nullptr);
+
+    pid_t pid = fork();
+    if (pid < 0) return -1;
+    if (pid == 0) {
+        // Child: replace image. execvp searches PATH for argv[0].
+        execvp(argv[0], argv.data());
+        _exit(127); // exec failed
+    }
+
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0) return -1;
+    if (WIFEXITED(status)) return WEXITSTATUS(status);
+    return -1;
+}
+
 static bool spawnLinker(const std::string& objPath, const std::string& outputPath,
                         const std::string& extraFlags = "") {
-    // Try multiple paths for runtime files:
-    // 1. Compiler directory (computed from /proc/self/exe or argv[0])
-    // 2. Current directory
-    // We try clang with just "runtime.o" and let the system resolve via PATH-like lookup
-    std::string cmd = "clang \"" + objPath + "\" runtime.o";
+    if (!isSafePath(objPath) || !isSafePath(outputPath)) {
+        std::cerr << "linker: unsafe path rejected\n";
+        return false;
+    }
 
-    // Include pyruntime.o if it exists (Python support) — try current dir
+    // Build the argv array directly — no shell, no string interpolation.
+    std::vector<std::string> args = {"clang", objPath, "runtime.o"};
+
+    // Include pyruntime.o if it exists (Python support) — try current dir.
     struct stat st;
     if (stat("pyruntime.o", &st) == 0) {
-        cmd += " pyruntime.o";
-        // Also add Python flags
+        args.push_back("pyruntime.o");
+        // Detect python3-config linker flags. The command here is a fixed
+        // literal (no user input), so popen is safe; the *output* is tokenized
+        // and passed literally to exec, never re-interpreted by a shell.
         std::string pyFlags;
         FILE* pipe = popen("python3-config --ldflags 2>/dev/null", "r");
         if (!pipe) { pipe = popen("python3-config --ldflags --embed 2>/dev/null", "r"); }
         if (pipe) {
             char buf[4096] = {};
-            if (fgets(buf, sizeof(buf), pipe)) {
-                pyFlags = buf;
-                if (!pyFlags.empty() && pyFlags.back() == '\n') pyFlags.pop_back();
-            }
+            std::string acc;
+            while (fgets(buf, sizeof(buf), pipe)) acc += buf;
             pclose(pipe);
+            pyFlags = acc;
         }
-        if (pyFlags.size() > 10) cmd += " " + pyFlags;
+        for (auto& tok : splitFlags(pyFlags)) args.push_back(tok);
     }
 
-    if (!extraFlags.empty()) cmd += " " + extraFlags;
-    cmd += " -o \"" + outputPath + "\" 2>&1";
-    int ret = std::system(cmd.c_str());
+    // User-supplied --link flags: tokenized and passed literally (no shell).
+    for (auto& tok : splitFlags(extraFlags)) args.push_back(tok);
+
+    args.push_back("-o");
+    args.push_back(outputPath);
+
+    int ret = runProcess(args);
     if (ret != 0) {
         std::cerr << "linker failed (exit=" << ret << ")\n";
         return false;
@@ -3580,7 +3641,15 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--use-interface" && i + 1 < argc) {
             useInterfaces.push_back(argv[++i]);
         } else if (arg == "--parallel" && i + 1 < argc) {
-            parallelThreads = std::max(1, atoi(argv[++i]));
+            int n = atoi(argv[++i]);
+            // Clamp to a sane range: at least 1, at most 4x hardware threads
+            // (or 64). Prevents resource-exhaustion from `--parallel 999999999`.
+            unsigned hw = std::thread::hardware_concurrency();
+            int maxThreads = (int)(hw ? hw * 4 : 16);
+            if (maxThreads > 64) maxThreads = 64;
+            if (n < 1) n = 1;
+            if (n > maxThreads) n = maxThreads;
+            parallelThreads = n;
         } else if (inputPath.empty()) {
             inputPath = arg;
         } else if (outputPath.empty()) {
