@@ -1,0 +1,16 @@
+fn main() {
+    // Arrays with bounds checking
+    arr = [1, 2, 3, 4, 5]
+    sum = arr[0] + arr[1] + arr[2] + arr[3] + arr[4]
+    print(sum)
+
+    // Move semantics for strings
+    greeting = "hello"
+    dest: str = greeting
+    print(dest)
+
+    // References and dereference
+    x = 42
+    ref = &x
+    print(*ref)
+}

@@ -1,0 +1,25 @@
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+fn main() -> i64 {
+    p = Point { x: 10, y: 20 }
+    print(p.x)
+    print(p.y)
+
+    // Struct assignment (copy)
+    q = p
+    print(q.x)
+    print(q.y)
+
+    // Nested struct via chained field access
+    print(p.x + p.y)
+
+    // Swap fields via struct literal
+    r = Point { x: p.y, y: p.x }
+    print(r.x)
+    print(r.y)
+
+    0
+}

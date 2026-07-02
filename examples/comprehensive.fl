@@ -1,0 +1,16 @@
+fn main() {
+    x = 5
+    y = 10
+    z = x + y
+    print(z)
+
+    result = z * 2 - 3
+    print(result)
+
+    mut counter = 0
+    counter = counter + 1
+    counter = counter + 10
+    print(counter)
+
+    print("flint is working")
+}

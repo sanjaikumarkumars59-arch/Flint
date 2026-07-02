@@ -1,0 +1,21 @@
+enum Option {
+    None,
+    Some(i64),
+}
+
+fn main() -> i64 {
+    x = Option.Some(42)
+    y = Option.None
+
+    match x {
+        Option.Some(v) => { print(v) },
+        Option.None => { print(0) },
+    }
+
+    match y {
+        Option.None => { print(99) },
+        Option.Some(v) => { print(v) },
+    }
+
+    0
+}

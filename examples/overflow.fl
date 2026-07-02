@@ -1,0 +1,7 @@
+fn main() -> i64 {
+    // i64 max: 9223372036854775807
+    a = 9223372036854775807
+    b = a + 1  // should overflow and panic
+    print(b)
+    0
+}

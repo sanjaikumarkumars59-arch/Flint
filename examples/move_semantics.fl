@@ -1,0 +1,5 @@
+fn main() {
+    x = "hello"
+    y: str = x
+    print(y)
+}

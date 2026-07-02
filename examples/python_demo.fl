@@ -1,0 +1,7 @@
+fn main() {
+    python {
+        "import math"
+    }
+    result = py_eval("int(math.sqrt(81))")
+    print(result)
+}

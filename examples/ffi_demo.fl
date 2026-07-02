@@ -1,0 +1,11 @@
+extern "C" {
+    fn puts(s: str) -> i64
+    fn add(a: i64, b: i64) -> i64
+}
+
+fn main() {
+    result = add(40, 2)
+    print(result)
+
+    puts("hello from C via flint")
+}

@@ -1,0 +1,6 @@
+fn main() {
+    mut x = 42
+    ref = &x
+    x = 99
+    print(*ref)
+}

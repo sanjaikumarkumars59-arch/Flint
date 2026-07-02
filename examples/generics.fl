@@ -1,0 +1,13 @@
+fn max<T>(a: T, b: T) -> T {
+    if a > b {
+        return a
+    } else {
+        return b
+    }
+}
+
+fn main() -> i64 {
+    x = max(3, 5)
+    print(x)
+    0
+}

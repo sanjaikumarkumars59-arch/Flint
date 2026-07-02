@@ -1,0 +1,9 @@
+extern "C" {
+    fn printf(fmt: str, ...) -> i64
+}
+
+fn main() {
+    printf("integer: %d\n", 42)
+    printf("string: %s\n", "hello from printf")
+    printf("two ints: %d and %d\n", 10, 20)
+}

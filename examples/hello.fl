@@ -1,0 +1,4 @@
+fn main() {
+    safe_x = 5
+    print(safe_x)
+}

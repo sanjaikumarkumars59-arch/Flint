@@ -1,0 +1,14 @@
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+fn main() -> i64 {
+    p = Point { x: 10, y: 20 }
+    print(p.x)
+    print(p.y)
+    p2 = Point { x: p.y, y: p.x }
+    print(p2.x)
+    print(p2.y)
+    0
+}
